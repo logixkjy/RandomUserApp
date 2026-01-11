@@ -194,34 +194,3 @@ extension UsersContainerViewController: UIPageViewControllerDataSource, UIPageVi
         segmentedControl.selectedSegmentIndex = idx
     }
 }
-
-private final class PlaceholderListViewController: UIViewController {
-    
-    private let titleText: String
-    private let color: UIColor
-    
-    init(titleText: String, color: UIColor) {
-        self.titleText = titleText
-        self.color = color
-        super.init(nibName: nil, bundle: nil)
-    }
-    
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-    
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        view.backgroundColor = color.withAlphaComponent(0.12)
-        
-        let label = UILabel()
-        label.text = titleText
-        label.font = .systemFont(ofSize: 22, weight: .semibold)
-        label.textColor = .label
-        
-        view.addSubview(label)
-        label.snp.makeConstraints { (make) in
-            make.center.equalToSuperview()
-        }
-    }
-}
