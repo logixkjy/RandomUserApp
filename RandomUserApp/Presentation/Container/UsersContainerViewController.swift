@@ -89,8 +89,8 @@ final class UsersContainerViewController: UIViewController {
     }
     
     private func configurePages() {
-        let maleListVC = PlaceholderListViewController(titleText: "Male users", color: .systemTeal)
-        let femaleListVC = PlaceholderListViewController(titleText: "Female users", color: .systemPink)
+        let maleListVC = UserListViewController(gender: .male)
+        let femaleListVC = UserListViewController(gender: .female)
         pages.append(maleListVC)
         pages.append(femaleListVC)
     }
