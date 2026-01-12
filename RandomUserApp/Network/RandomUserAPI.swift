@@ -80,7 +80,6 @@ struct RandomUserAPI {
         guard let url = comps?.url else {
             throw APIError.invalidURL
         }
-        print("url \(url)")
         
         let (data, resp) = try await URLSession.shared.data(from: url)
         guard let http = resp as? HTTPURLResponse else {

@@ -8,34 +8,6 @@
 import UIKit
 import SnapKit
 
-enum Gender: Int, CaseIterable {
-    case male = 0
-    case female = 1
-    
-    var title: String {
-        switch self {
-        case .male: return "Male"
-        case .female: return "Female"
-        }
-    }
-}
-
-enum LayoutMode {
-    case oneColumn
-    case twoColumn
-    
-    mutating func toggle() {
-        self = (self == .oneColumn) ? .twoColumn : .oneColumn
-    }
-    
-    var iconName: String {
-        switch self {
-        case .oneColumn: return "square.grid.2x2"
-        case .twoColumn: return "rectangle.grid.1x2"
-        }
-    }
-}
-
 protocol UserListLayoutApplicable: AnyObject {
     func applyLayout(_ mode: LayoutMode, animated: Bool)
     func scrollToTop(animated: Bool)
