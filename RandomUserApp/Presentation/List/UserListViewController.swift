@@ -295,6 +295,17 @@ extension UserListViewController: UICollectionViewDelegate {
         if isInEditingMode {
             onSelectionStateChanged?(selectedCount(), isInEditingMode)
         } else {
+            guard let item = dataSource.itemIdentifier(for: indexPath) else {
+                collectionView.deselectItem(at: indexPath, animated: true)
+                return
+            }
+            
+            let url = item.largeURL ?? item.thumbnailURL
+            let detail = PhotoDetailViewController(imageURL: url, title: item.name)
+            let nav = UINavigationController(rootViewController: detail)
+            nav.modalPresentationStyle = .fullScreen
+            present(nav, animated: true)
+            
             collectionView.deselectItem(at: indexPath, animated: true)
         }
     }
