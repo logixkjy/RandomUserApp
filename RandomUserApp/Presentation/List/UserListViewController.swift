@@ -13,6 +13,41 @@ final class UserListViewController: UIViewController, UserListLayoutApplicable {
     private enum Section: Int, CaseIterable {
         case main
     }
+    
+    var onSelectionStateChanged: ((_ selectedCount: Int, _ isEditing: Bool) -> Void)?
+
+    private(set) var isInEditingMode: Bool = false
+
+    func setEditingMode(_ editing: Bool) {
+        isInEditingMode = editing
+        collectionView.allowsMultipleSelection = editing
+
+        if !editing {
+            collectionView.indexPathsForSelectedItems?.forEach {
+                collectionView.deselectItem(at: $0, animated: false)
+            }
+        }
+        onSelectionStateChanged?(selectedCount(), isInEditingMode)
+    }
+
+    func deleteSelected() {
+        guard isInEditingMode,
+              let selected = collectionView.indexPathsForSelectedItems,
+              !selected.isEmpty
+        else { return }
+
+        let selectedItems: [UserListItem] = selected.compactMap { dataSource.itemIdentifier(for: $0) }
+        let uuidsToDelete = Set(selectedItems.map { $0.uuid })
+
+        deletedUUIDs.formUnion(uuidsToDelete)
+
+        items.removeAll { uuidsToDelete.contains($0.uuid) }
+
+        selected.forEach { collectionView.deselectItem(at: $0, animated: false) }
+        applySnapshot(animated: true)
+
+        onSelectionStateChanged?(selectedCount(), isInEditingMode)
+    }
 
     private let gender: Gender
 
@@ -132,11 +167,6 @@ final class UserListViewController: UIViewController, UserListLayoutApplicable {
         return UICollectionViewCompositionalLayout(section: section)
     }
 
-    func setItems(_ newItems: [UserListItem], animated: Bool) {
-        items = newItems
-        applySnapshot(animated: animated)
-    }
-
     private func applySnapshot(animated: Bool) {
         var snapshot = NSDiffableDataSourceSnapshot<Section, UserListItem>()
         snapshot.appendSections([.main])
@@ -152,6 +182,7 @@ final class UserListViewController: UIViewController, UserListLayoutApplicable {
 
         let newLayout = makeLayout(for: mode)
         collectionView.setCollectionViewLayout(newLayout, animated: animated)
+        collectionView.collectionViewLayout.invalidateLayout()
         
         for case let cell as UserCell in collectionView.visibleCells {
             cell.apply(mode: mode)
@@ -253,11 +284,25 @@ final class UserListViewController: UIViewController, UserListLayoutApplicable {
         
         await setLoading(false)
     }
+    
+    private func selectedCount() -> Int {
+        collectionView.indexPathsForSelectedItems?.count ?? 0
+    }
 }
 
 extension UserListViewController: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        
+        if isInEditingMode {
+            onSelectionStateChanged?(selectedCount(), isInEditingMode)
+        } else {
+            collectionView.deselectItem(at: indexPath, animated: true)
+        }
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, didDeselectItemAt indexPath: IndexPath) {
+        if isInEditingMode {
+            onSelectionStateChanged?(selectedCount(), isInEditingMode)
+        }
     }
     
     func scrollViewDidScroll(_ scrollView: UIScrollView) {

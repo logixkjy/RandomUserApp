@@ -125,4 +125,12 @@ final class UserCell: UICollectionViewCell {
         
         setNeedsLayout()
     }
+    
+    override var isSelected: Bool {
+        didSet {
+            contentView.alpha = isSelected ? 0.7 : 1.0
+            contentView.layer.borderWidth = isSelected ? 2.0 : 0.0
+            contentView.layer.borderColor = isSelected ? UIColor.systemRed.cgColor : UIColor.clear.cgColor
+        }
+    }
 }

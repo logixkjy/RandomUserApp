@@ -41,12 +41,10 @@ protocol UserListLayoutApplicable: AnyObject {
     func scrollToTop(animated: Bool)
 }
 
-
 final class UsersContainerViewController: UIViewController {
     
     private let segmentedControl: UISegmentedControl = {
         let control = UISegmentedControl(items: Gender.allCases.map(\.title))
-        control.selectedSegmentIndex = Gender.male.rawValue
         return control
     }()
     
@@ -66,7 +64,13 @@ final class UsersContainerViewController: UIViewController {
         return pageViewController
     }()
     
-    private var pages: [UIViewController] = []
+    private lazy var listVCs: [UserListViewController] = Gender.allCases.map { gender in
+        let vc = UserListViewController(gender: gender)
+        attachCallbacks(to: vc)
+        return vc
+    }
+    
+    private var currentIndex: Int = 0
     
     private var layoutMode: LayoutMode = .oneColumn {
         didSet {
@@ -74,43 +78,67 @@ final class UsersContainerViewController: UIViewController {
         }
     }
     
+    private lazy var editItem = UIBarButtonItem(
+        title: "Edit",
+        style: .plain,
+        target: self,
+        action: #selector(onTapEdit)
+    )
+    
+    private lazy var deleteItem = UIBarButtonItem(
+        title: "Delete",
+        style: .plain,
+        target: self,
+        action: #selector(onTapDelete)
+    )
+    
+    private lazy var countItem = UIBarButtonItem(
+        title: "0 selected",
+        style: .plain,
+        target: self,
+        action: nil
+    )
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         
         view.backgroundColor = .systemBackground
         title = "Random Users"
         
-        configurePages()
+        navigationController?.isToolbarHidden = false
+        
         configureUI()
         configureConstraints()
         configureActions()
         configureInitialPage()
         updateFloatingButtonIcon()
-    }
-    
-    private func configurePages() {
-        let maleListVC = UserListViewController(gender: .male)
-        let femaleListVC = UserListViewController(gender: .female)
-        pages.append(maleListVC)
-        pages.append(femaleListVC)
+        configureToolbar(isEditing: false, selectedCount: 0)
     }
     
     private func configureUI() {
-        navigationItem.titleView = segmentedControl
+        segmentedControl.selectedSegmentIndex = currentIndex
+        view.addSubview(segmentedControl)
         
         addChild(pageViewController)
         view.addSubview(pageViewController.view)
         pageViewController.didMove(toParent: self)
         
-        view.addSubview(floatingButton)
-        
         pageViewController.dataSource = self
         pageViewController.delegate = self
+        
+        view.addSubview(floatingButton)
     }
     
     private func configureConstraints() {
+        segmentedControl.snp.makeConstraints { (make) in
+            make.top.equalTo(view.safeAreaLayoutGuide).offset(8)
+            make.leading.trailing.equalTo(view.safeAreaLayoutGuide).inset(12)
+            make.height.equalTo(32)
+        }
+        
         pageViewController.view.snp.makeConstraints { (make) in
-            make.edges.equalTo(view.safeAreaLayoutGuide)
+            make.top.equalTo(segmentedControl.snp.bottom).offset(8)
+            make.leading.trailing.bottom.equalTo(view.safeAreaLayoutGuide)
         }
         
         floatingButton.snp.makeConstraints { (make) in
@@ -126,39 +154,56 @@ final class UsersContainerViewController: UIViewController {
     }
     
     private func configureInitialPage() {
-        guard let firstViewController = pages.first else { return }
-        pageViewController.setViewControllers([firstViewController], direction: .forward, animated: false, completion: nil)
+        pageViewController.setViewControllers([listVCs[currentIndex]], direction: .forward, animated: false, completion: nil)
+    }
+    
+    private var currentListVC: UserListViewController {
+       listVCs[currentIndex]
+    }
+    
+    private func attachCallbacks(to vc: UserListViewController) {
+        vc.onSelectionStateChanged = { [weak self, weak vc] selectedCount, isEditing in
+            guard let self else { return }
+            
+            guard vc === self.currentListVC else { return }
+            self.configureToolbar(isEditing: isEditing, selectedCount: selectedCount)
+        }
+    }
+    
+    private func configureToolbar(isEditing: Bool, selectedCount: Int) {
+        editItem.title = isEditing ? "Done" : "Edit"
+        deleteItem.isEnabled = isEditing && selectedCount > 0
+        countItem.isEnabled = isEditing
+        countItem.title = "\(selectedCount) selected"
+
+        let flex = UIBarButtonItem(systemItem: .flexibleSpace)
+        setToolbarItems([editItem, flex, countItem, flex, deleteItem], animated: false)
     }
     
     @objc private func onSegmentChange() {
-        let targetIdx = segmentedControl.selectedSegmentIndex
-        moveToPage(index: targetIdx, animated: true, alsoScrollToTop: true)
+        let newIndex = segmentedControl.selectedSegmentIndex
+        guard newIndex != currentIndex else { return }
+        
+        let direction: UIPageViewController.NavigationDirection = (newIndex > currentIndex) ? .forward : .reverse
+        let prevVC = currentListVC
+        
+        currentIndex = newIndex
+        let nextVC = currentListVC
+        
+        prevVC.setEditingMode(false)
+        nextVC.setEditingMode(false)
+        
+        pageViewController.setViewControllers([nextVC], direction: direction, animated: true) { _ in
+            nextVC.scrollToTop(animated: true)
+        }
+        
+        // toolbar 초기화
+        configureToolbar(isEditing: nextVC.isInEditingMode, selectedCount: 0)
     }
     
     @objc private func onTapFloating() {
         layoutMode.toggle()
         broadcastLayoutMode(animated: true)
-    }
-    
-    private func moveToPage(index: Int, animated: Bool, alsoScrollToTop: Bool) {
-        guard index >= 0, index < pages.count else { return }
-        
-        let curIdx = currentPageIndex() ?? 0
-        let direction: UIPageViewController.NavigationDirection = index > curIdx ? .forward : .reverse
-        let targetVC = pages[index]
-        
-        pageViewController.setViewControllers([targetVC], direction: direction, animated: animated) { _ in
-            if alsoScrollToTop, let applicable = targetVC as? UserListLayoutApplicable {
-                applicable.scrollToTop(animated: true)
-            }
-        }
-    }
-    
-    private func currentPageIndex() -> Int? {
-        guard let current = pageViewController.viewControllers?.first else {
-            return nil
-        }
-        return pages.firstIndex(of: current)
     }
     
     private func updateFloatingButtonIcon() {
@@ -167,30 +212,46 @@ final class UsersContainerViewController: UIViewController {
     }
     
     private func broadcastLayoutMode(animated: Bool) {
-        for vc in pages {
-            (vc as? UserListLayoutApplicable)?.applyLayout(layoutMode, animated: animated)
+        for vc in listVCs {
+            vc.applyLayout(layoutMode, animated: animated)
         }
     }
 
+    @objc private func onTapEdit() {
+        let vc = currentListVC
+        vc.setEditingMode(!vc.isInEditingMode)
+    }
+
+    @objc private func onTapDelete() {
+        currentListVC.deleteSelected()
+    }
+    
 }
 
 extension UsersContainerViewController: UIPageViewControllerDataSource, UIPageViewControllerDelegate {
     func pageViewController(_ pageViewController: UIPageViewController, viewControllerBefore viewController: UIViewController) -> UIViewController? {
-        guard let idx = pages.firstIndex(of: viewController) else { return nil }
+        guard let idx = listVCs.firstIndex(where: { $0 === viewController }) else { return nil }
         let prev = idx - 1
         guard prev >= 0 else { return nil }
-        return pages[prev]
+        return listVCs[prev]
     }
     
     func pageViewController(_ pageViewController: UIPageViewController, viewControllerAfter viewController: UIViewController) -> UIViewController? {
-        guard let idx = pages.firstIndex(of: viewController) else { return nil }
+        guard let idx = listVCs.firstIndex(where: { $0 === viewController }) else { return nil }
         let next = idx + 1
-        guard next < pages.count else { return nil }
-        return pages[next]
+        guard next < listVCs.count else { return nil }
+        return listVCs[next]
     }
     
     func pageViewController(_ pageViewController: UIPageViewController, didFinishAnimating finished: Bool, previousViewControllers: [UIViewController], transitionCompleted completed: Bool) {
-        guard completed, let idx = currentPageIndex() else { return }
+        guard completed,
+              let shown = pageViewController.viewControllers?.first,
+              let idx = listVCs.firstIndex(where: { $0 === shown }) else { return }
+        
+        currentIndex = idx
         segmentedControl.selectedSegmentIndex = idx
+        
+        currentListVC.setEditingMode(false)
+        configureToolbar(isEditing: false, selectedCount: 0)
     }
 }
