@@ -71,27 +71,27 @@ Container 중심 제어
 	•	Page 전환 시 편집 상태 자동 초기화
 
 📂 프로젝트 구조
-├─ App
-│  ├─ AppDelegate.swift
-│  ├─ SceneDelegate.swift
-│
-├─ Container
-│  ├─ UsersContainerViewController.swift
-│
-├─ List
-│  ├─ UserListViewController.swift
-│  ├─ UserCell.swift
-│
-├─ Detail
-│  ├─ PhotoDetailViewController.swift
-│
-├─ Network
-│  ├─ RandomUserAPI.swift
-│
-├─ Model
-│  ├─ UserListItem.swift
-│  ├─ Gender.swift
-│  ├─ LayoutMode.swift
+- App
+	- AppDelegate.swift
+	- SceneDelegate.swift
+
+- Container
+	- UsersContainerViewController.swift
+
+- List
+	- UserListViewController.swift
+	- UserCell.swift
+
+- Detail
+	- PhotoDetailViewController.swift
+
+- Network
+	- RandomUserAPI.swift
+
+- Model
+	- UserListItem.swift
+	-  Gender.swift
+	- LayoutMode.swift
 
 🚀 실행 방법
 	1.	Xcode 15 이상에서 프로젝트 열기
