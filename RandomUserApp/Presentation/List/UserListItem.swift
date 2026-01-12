@@ -11,7 +11,10 @@ struct UserListItem: Hashable, Sendable {
     let uuid: String
     let name: String
     let subtitle: String
+    let email: String
     let thumbnailURL: URL?
+    let largeURL: URL?
+    let mediumURL: URL?
 
     func hash(into hasher: inout Hasher) {
         hasher.combine(uuid)

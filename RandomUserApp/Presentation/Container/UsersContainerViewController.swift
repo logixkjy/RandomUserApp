@@ -30,8 +30,8 @@ enum LayoutMode {
     
     var iconName: String {
         switch self {
-        case .oneColumn: return "rectangle.grid.1x2"
-        case .twoColumn: return "square.grid.2x2"
+        case .oneColumn: return "square.grid.2x2"
+        case .twoColumn: return "rectangle.grid.1x2"
         }
     }
 }
@@ -52,7 +52,7 @@ final class UsersContainerViewController: UIViewController {
     
     private let floatingButton: UIButton = {
         let button = UIButton(type: .system)
-        button.setImage(UIImage(systemName: "rectangle.grid.1x2"), for: .normal)
+        button.setImage(UIImage(systemName: "square.grid.2x2"), for: .normal)
         button.tintColor = .white
         button.backgroundColor = .systemBlue
         button.layer.cornerRadius = 28

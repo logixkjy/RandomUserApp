@@ -18,6 +18,15 @@ final class UserListViewController: UIViewController, UserListLayoutApplicable {
 
     private var layoutMode: LayoutMode = .oneColumn
     private var items: [UserListItem] = []
+    
+    private let resultsPerPage: Int = 20
+    private var currentPage: Int = 1
+    
+    private var isLoading: Bool = false
+    private var reachedEnd: Bool = false
+    
+    private var seedUUIDs = Set<String>()
+    private var deletedUUIDs = Set<String>()
 
     private lazy var collectionView: UICollectionView = {
         let cv = UICollectionView(frame: .zero, collectionViewLayout: makeLayout(for: layoutMode))
@@ -45,11 +54,11 @@ final class UserListViewController: UIViewController, UserListLayoutApplicable {
         configureConstraints()
         configureCollectionView()
         configureDataSource()
+        configureRefresh()
 
         applySnapshot(animated: false)
 
-        // 데모 데이터(네트워크 붙이면 제거)
-        seedDemoItems()
+        Task { await refresh() }
     }
 
     private func configureUI() {
@@ -78,15 +87,21 @@ final class UserListViewController: UIViewController, UserListLayoutApplicable {
                 for: indexPath
             ) as? UserCell else { return UICollectionViewCell() }
 
-            cell.configure(
-                name: item.name,
-                subtitle: item.subtitle,
-                thumbnailURL: item.thumbnailURL
-            )
+            cell.configure(item: item)
             cell.apply(mode: self.layoutMode)
             
             return cell
         }
+    }
+    
+    private func configureRefresh() {
+        let rc = UIRefreshControl()
+        rc.addTarget(self, action: #selector(onPullToRefresh), for: .valueChanged)
+        collectionView.refreshControl = rc
+    }
+    
+    @objc private func onPullToRefresh() {
+        Task { await refresh() }
     }
 
     private func makeLayout(for mode: LayoutMode) -> UICollectionViewLayout {
@@ -156,23 +171,106 @@ final class UserListViewController: UIViewController, UserListLayoutApplicable {
         guard !items.isEmpty else { return }
         collectionView.setContentOffset(.zero, animated: animated)
     }
-
-    private func seedDemoItems() {
-        let prefix = (gender == .male) ? "M" : "F"
-        let demo: [UserListItem] = (1...18).map { i in
-            UserListItem(
-                uuid: "\(prefix)-uuid-\(i)",
-                name: "\(prefix) User \(i)",
-                subtitle: "subtitle \(i)",
-                thumbnailURL: nil
-            )
+    
+    @MainActor
+    private func setLoading(_ isLoading: Bool) async {
+        self.isLoading = isLoading
+        if !isLoading {
+            collectionView.refreshControl?.endRefreshing()
         }
-        setItems(demo, animated: false)
+    }
+    
+    private func resetStateFoRefresh() {
+        currentPage = 1
+        reachedEnd = false
+        seedUUIDs.removeAll()
+        items.removeAll()
+    }
+    
+    private func appendDedupKeepingOrder(_ newItems: [UserListItem]) {
+        for item in newItems {
+            guard !deletedUUIDs.contains(item.uuid) else { continue }
+            if seedUUIDs.insert(item.uuid).inserted {
+                items.append(item)
+            }
+        }
+    }
+    
+    private func showErrorAlert(_ message: String) {
+        let alert = UIAlertController(title: "Error", message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
+    }
+    
+    func refresh() async {
+        if isLoading { return }
+        await setLoading(true)
+        resetStateFoRefresh()
+        
+        do {
+            let result = try await RandomUserAPI.fetchUsers(
+                gender: gender,
+                page: currentPage,
+                results: resultsPerPage
+            )
+            
+            appendDedupKeepingOrder(result.items)
+            applySnapshot(animated: false)
+        } catch {
+            await MainActor.run {
+                showErrorAlert("Failed to fetch users. Please try again. \n\(error)")
+            }
+        }
+        
+        await setLoading(false)
+    }
+    
+    func loadNextPageIfNeeded() async {
+        if isLoading || reachedEnd { return }
+        
+        let nextPage = currentPage + 1
+        await setLoading(true)
+        
+        do {
+            let result = try await RandomUserAPI.fetchUsers(
+                gender: gender,
+                page: nextPage,
+                results: resultsPerPage
+            )
+            
+            if result.items.isEmpty {
+                reachedEnd = true
+            } else {
+                currentPage = nextPage
+                appendDedupKeepingOrder(result.items)
+                applySnapshot(animated: true)
+            }
+        } catch {
+            await MainActor.run {
+                showErrorAlert("Failed to load next page. Please try again. \n\(error)")
+            }
+        }
+        
+        await setLoading(false)
     }
 }
 
 extension UserListViewController: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         
+    }
+    
+    func scrollViewDidScroll(_ scrollView: UIScrollView) {
+        let threshold: CGFloat = 400.0
+        let offsetY = scrollView.contentOffset.y
+        let contentHeight = scrollView.contentSize.height
+        let visibleHeight = scrollView.frame.size.height
+        
+        guard contentHeight > 0 else { return }
+        if offsetY > contentHeight - visibleHeight - threshold {
+            Task {
+                await loadNextPageIfNeeded()
+            }
+        }
     }
 }

@@ -15,12 +15,15 @@ final class UserCell: UICollectionViewCell {
     private let thumbImageView = UIImageView()
     private let nameLabel = UILabel()
     private let subtitleLabel = UILabel()
+    private let emailLabel = UILabel()
     
     private let textStackView = UIStackView()
     private let rootStackView = UIStackView()
     
     private var aspectRatioConstraint: Constraint?
     private var fixedWidthConstraint: Constraint?
+    
+    private var userItem: UserListItem? = nil
     
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -57,10 +60,15 @@ final class UserCell: UICollectionViewCell {
         subtitleLabel.textColor = .label
         subtitleLabel.numberOfLines = 2
         
+        emailLabel.font = .systemFont(ofSize: 13, weight: .regular)
+        emailLabel.textColor = .label
+        emailLabel.numberOfLines = 2
+        
         textStackView.axis = .vertical
         textStackView.spacing = 6
         textStackView.addArrangedSubview(nameLabel)
         textStackView.addArrangedSubview(subtitleLabel)
+        textStackView.addArrangedSubview(emailLabel)
         
         rootStackView.spacing = 12
         rootStackView.alignment = .fill
@@ -81,11 +89,14 @@ final class UserCell: UICollectionViewCell {
         }
     }
     
-    func configure(name: String, subtitle: String, thumbnailURL: URL?) {
-        nameLabel.text = name
-        subtitleLabel.text = subtitle
+    func configure(item: UserListItem) {
+        userItem = item
         
-        if let url = thumbnailURL {
+        nameLabel.text = userItem?.name
+        subtitleLabel.text = userItem?.subtitle
+        emailLabel.text = userItem?.email
+        
+        if let url = userItem?.largeURL {
             thumbImageView.kf.setImage(with: url)
         } else {
             thumbImageView.image = UIImage(systemName: "person.crop.square")
